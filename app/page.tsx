@@ -1,11 +1,12 @@
 "use client";
-import {useState} from "react";
+import {useState, useTransition} from "react";
 import LinkPreview, {LinkViewProps} from "@/components/preview/preview";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import SimplePreview from "@/components/preview/simple-preview";
 import {getPreview} from "@/lib/preview";
 import {ModeToggle} from "@/components/mode-toggle";
+import {BeatLoader} from "react-spinners";
 
 function getLargestFavicon(favicons: string[]): string {
     return favicons.sort((a: string, b: string) => {
@@ -43,19 +44,25 @@ function transformResponse(res: any, url: string): LinkViewProps {
 export default function LinkPreviews() {
     const [url, setUrl] = useState("");
     const [links, setLinks] = useState<Array<LinkViewProps | string>>([]);
+    const [isPending, startTransition] = useTransition();
 
     const getData = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const copy = url;
         setUrl("");
-        const res = await getPreview(url);
-        console.log(res);
-        if (typeof res === "string") {
-            setLinks((prevLinks) => [res, ...prevLinks]);
-            return;
-        }
-        const linkPreview = transformResponse(res, copy);
-        setLinks((prevLinks) => [linkPreview, ...prevLinks]);
+        startTransition(async () => {
+            await getPreview(url)
+                .then((data) => {
+                    console.log(data);
+                    if (typeof data === "string") {
+                        setLinks((prevLinks) => [data, ...prevLinks]);
+                        return;
+                    }
+                    const linkPreview = transformResponse(data, copy);
+                    setLinks((prevLinks) => [linkPreview, ...prevLinks]);
+                });
+        });
+
     };
 
     return (
@@ -65,10 +72,13 @@ export default function LinkPreviews() {
                 <form className="w-80 flex flex-col items-center" onSubmit={getData}>
                     <Input
                         value={url}
+                        disabled={isPending}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
                         placeholder="Enter a URL"/>
                     <br/>
-                    <Button type="submit">Generate preview</Button>
+                    <Button type="submit" disabled={isPending} className="m-3">
+                        {isPending ? <BeatLoader /> : "Generate preview"}
+                    </Button>
                     <br/>
                     <div className="flex flex-col gap-4">
                         {links.map((link, index) => {
